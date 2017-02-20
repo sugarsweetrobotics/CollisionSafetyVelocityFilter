@@ -36,7 +36,12 @@ static const char* collisionsafetyvelocityfilter_spec[] =
     "conf.default.FyToVx", "0.0",
     "conf.default.FyToVy", "0.1",
     "conf.default.FyToVa", "0.1",
+	"conf.default.skipCount", "10",
+	"conf.default.G1", "1.0",
+	"conf.default.G2", "0.0",
+	"conf.default.minVelocity", "0.05",
     "conf.default.debug", "0",
+	
     // Widget
     "conf.__widget__.deadRangeAngleRadian", "text",
     "conf.__widget__.maxRangeAngleRadian", "text",
@@ -86,6 +91,9 @@ RTC::ReturnCode_t CollisionSafetyVelocityFilter::onInitialize()
   // Set InPort buffers
   addInPort("range", m_rangeIn);
   addInPort("Vin", m_VinIn);
+
+  // Add Data Listener. DataListener class is defined in CollisionSafetyVelocityFilter.h
+  m_VinIn.addConnectorDataListener(ON_BUFFER_WRITE, new DataListener(this));
   
   // Set OutPort buffer
   addOutPort("Vout", m_VoutOut);
@@ -111,6 +119,10 @@ RTC::ReturnCode_t CollisionSafetyVelocityFilter::onInitialize()
   bindParameter("FyToVx", m_FyToVx, "0.0");
   bindParameter("FyToVy", m_FyToVy, "0.1");
   bindParameter("FyToVa", m_FyToVa, "0.1");
+  bindParameter("skipCount", m_skipCount, "10");
+  bindParameter("G1", m_G1, "1.0");
+  bindParameter("G2", m_G2, "0.0");
+  bindParameter("minVelocity", m_minVelocity, "0.05");
   bindParameter("debug", m_debug, "0");
   // </rtc-template>
   
@@ -141,21 +153,27 @@ RTC::ReturnCode_t CollisionSafetyVelocityFilter::onShutdown(RTC::UniqueId ec_id)
 
 RTC::ReturnCode_t CollisionSafetyVelocityFilter::onActivated(RTC::UniqueId ec_id)
 {
+	m_rangeInit = false;
   return RTC::RTC_OK;
 }
 
 
 RTC::ReturnCode_t CollisionSafetyVelocityFilter::onDeactivated(RTC::UniqueId ec_id)
 {
+	m_rangeInit = false;
   return RTC::RTC_OK;
 }
 
-/*
+
 RTC::ReturnCode_t CollisionSafetyVelocityFilter::onExecute(RTC::UniqueId ec_id)
 {
+	if (m_rangeIn.isNew()) {
+		m_rangeInit = true;
+		m_rangeIn.read();
+	}
   return RTC::RTC_OK;
 }
-*/
+
 
 /*
 RTC::ReturnCode_t CollisionSafetyVelocityFilter::onAborting(RTC::UniqueId ec_id)

@@ -149,7 +149,7 @@ class CollisionSafetyVelocityFilter
    * 
    * 
    */
-  // virtual RTC::ReturnCode_t onExecute(RTC::UniqueId ec_id);
+   virtual RTC::ReturnCode_t onExecute(RTC::UniqueId ec_id);
 
   /***
    *
@@ -294,6 +294,14 @@ class CollisionSafetyVelocityFilter
    * - DefaultValue: 0.1
    */
   float m_FyToVa;
+
+  float m_skipCount;
+
+  float m_G1;
+
+  float m_G2;
+
+  float m_minVelocity;
   /*!
    * 
    * - Name:  debug
@@ -350,6 +358,114 @@ class CollisionSafetyVelocityFilter
   
   // </rtc-template>
 
+ public:
+
+	 bool m_rangeInit;
+	 void calculateVelocity(const RTC::TimedVelocity2D& data) {
+		 if (!m_rangeInit) {
+			 std::cout << "[CollisionSafetyVelocityFilter] Range Data is not arrived. No velocity is output." << std::endl;
+		 }
+
+
+		 double Fx_sum = 0;
+		 double Fy_sum = 0;
+		 int step = m_skipCount;
+		 int i;
+		 for (i = 0; i < m_range.ranges.length(); i += step) {
+
+			 double angle = m_range.config.minAngle + m_range.config.angularRes * i;
+			 if (angle < -m_maxRangeAngleRadian || angle > +m_maxRangeAngleRadian) {
+				 continue;
+			 }
+
+			 if (angle < m_deadRangeAngleRadian && angle > -m_deadRangeAngleRadian) {
+				 continue;
+			 }
+
+
+		
+
+			 double distance = m_range.ranges[i];
+			 if (distance < m_deadDistanceMeter || distance > m_maxDistanceMeter) {
+				 continue;
+			 }
+
+
+			 double factor = 1.57 - angle;
+			 if (angle < 0) {
+				 factor = -1.57 - angle;
+			 }
+
+
+			 double deltaDistance = m_maxDistanceMeter - distance;
+			 /// ‹——£‚É‘Î‚·‚éƒQƒCƒ“G1, ‹——£‚Ì“ñæ‚É‘Î‚·‚éƒQƒCƒ“G2
+			 double F = m_G1 * deltaDistance + m_G2 * (deltaDistance * deltaDistance);
+			 double Fx = F * cos(angle);
+			 double Fy = F * sin(angle);
+
+			 Fx_sum += Fx;
+			 Fy_sum += Fy;
+		 }
+
+		 double Fx_mean = Fx_sum / i;
+		 double Fy_mean = Fy_sum / i;
+
+		 //std::cout << "VY = " << vy << "\n";
+		 m_Vout.data = m_Vin.data;
+		 if (m_Vout.data.vx > m_minVelocity || m_Vout.data.vx < -m_minVelocity) {
+			 m_Vout.data.vx = m_Vout.data.vx + m_FxToVx * Fx_mean + m_FyToVx * Fy_mean;
+			 if (m_Vin.data.vx > 0) {
+				 if (m_Vout.data.vx < m_minVelocity) {
+					 m_Vout.data.vx = m_minVelocity;
+				 }
+			 }
+			 else {
+				 if (m_Vout.data.vx > -m_minVelocity) {
+					 m_Vout.data.vx = -m_minVelocity;
+				 }
+			 }
+
+			 m_Vout.data.vy = m_Vout.data.vy + m_FxToVy * Fx_mean + m_FyToVy * Fy_mean;
+			 if (m_Vin.data.vy > 0) {
+				 if (m_Vout.data.vy < m_minVelocity) {
+					 m_Vout.data.vy = m_minVelocity;
+				 }
+			 }
+			 else {
+				 if (m_Vout.data.vy > -m_minVelocity) {
+					 m_Vout.data.vy = -m_minVelocity;
+				 }
+			 }
+
+			 m_Vout.data.va = m_Vout.data.va + m_FxToVa * Fx_mean + m_FyToVa * Fy_mean;
+		 }
+		 m_Vout.tm = m_Vin.tm;
+		 m_VoutOut.write();
+	 }
+};
+
+
+
+
+class DataListener
+	: public ConnectorDataListenerT<RTC::TimedVelocity2D>
+{
+public:
+	DataListener(CollisionSafetyVelocityFilter* rtc) : m_parent(rtc), vx(0), vy(0), vz(0) {}
+	virtual ~DataListener()
+	{
+		//std::cout << "dtor of " << m_name << std::endl;
+	}
+
+	virtual void operator()(const ConnectorInfo& info,
+		const RTC::TimedVelocity2D& data)
+	{
+		m_parent->calculateVelocity(data);
+	};
+
+
+	CollisionSafetyVelocityFilter *m_parent;
+	double vx, vy, vz;
 };
 
 
