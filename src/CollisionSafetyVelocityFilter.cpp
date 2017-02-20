@@ -18,7 +18,7 @@ static const char* collisionsafetyvelocityfilter_spec[] =
     "description",       "Collision Avoider using Range Sensor for Mobile Robots",
     "version",           "1.0.0",
     "vendor",            "SugarSweetRobotics",
-    "category",          "Navigatio",
+    "category",          "Navigation",
     "activity_type",     "PERIODIC",
     "kind",              "DataFlowComponent",
     "max_instance",      "1",
